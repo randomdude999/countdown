@@ -1,3 +1,4 @@
+=====================
 Countdown bruteforcer
 =====================
 
@@ -28,8 +29,59 @@ different because, for example, when choosing 4 large numbers, scenarios where
 the last 2 small numbers are the same are 4x less likely to actually happen
 than scenarios where the last 2 are different.
 
+Approach
+========
+
+Look-up tables
+--------------
+
+The LUTs for 1 large, 2 large, or 3 large chosen numbers work as follows. For
+1LUT, a line like "1LUT:82: 1263657/6882261" means that out of all games with
+gamesets containing only 1 large number, that number being 82, there were
+1263657 winnable games (or 6882261 weighted winnable games). Then, to compute
+the number of winnable games of a set of 4 large numbers, it suffices to add the
+corresponding 1LUT entries.
+
+For 2LUT, the format is similar: "2LUT:36,24: 535047/4287720" means there were
+535047 winnable games with gamesets containing the large numbers 36 and 24, and
+4 small numbers. To compute the answer for a set of 4 large numbers then, it is
+necessary to add the 2LUT entries corresponding to all pairs of the 4 large
+numbers: for a set like (82, 61, 36, 24) it would be the entries for the pairs
+(82, 61), (82, 36), (82, 24), (61, 36), (61, 24), (36, 24).
+
+3LUT is the same as 2LUT except with 3 numbers instead. For 4 large numbers,
+there is no LUT, as the LUT would be just as big as the results table itself.
+
+Solving a single gameset
+------------------------
+
+For a single gameset of 6 numbers, the solver works as follows. For each pair of
+numbers in the input, it combines them using the 4 possible operations, and in
+case of a valid result, recursively calls itself again, removing the 2 operands
+from the set and adding the result. The solver returns these results as a bitset
+of 900 bits, each bit representing whether it is possible to reach a number from
+100 to 999 using the given set. The results from these recursive calls are then
+OR'd together to get all reachable target numbers.
+
+One important aspect of this solver is memoization: there is a cache of 4
+million or 8 million entires, indexed by the hash of the input set, which gets
+filled each time the recursive solver finds a result for one set. The solver
+also checks at the beginning of each recursive call whether the input already
+exists in the cache, and if it does, returns that instead. If there is a hash
+collision, the new value just overwrites the old one.
+
+In the end, inside solving a single gameset, this kind of cache has a hit rate
+of around 90%, which corresponds to even more than 90% time saved, since some of
+those hits were at high levels of recursion, and allowed pruning a large branch
+of the search tree with each hit.
+
+Also, this means that when solving related gamesets in sequence, the new gameset
+can use all cached values from the previous one, which gives an even further
+speedup, as in most cases inputs to consecutive solver calls will only differ in
+1 or 2 numbers.
+
 Running the solver
-------------------
+==================
 
 The main solver can be invoked in 4 different ways, corresponding to computing
 the LUTs for 1, 2, or 3 chosen large numbers, and for computing the results
@@ -63,16 +115,23 @@ To compute the actual results from the LUTs for 1, 2 or 3 large chosen, run
 ``python combine_lut.py lut1.txt lut2.txt lut3.txt >results_lut.txt``.
 
 Viewing the outputs
--------------------
+===================
 
 At this point you actually have all of the results. You can use the
-``sol_parse.py`` script to find the 10 best/worst sets of large numbers
-according to a bunch of criteria.
+``sol_parse.py`` script to find the 10 best/worst sets of large numbers.
 
-TODO: document sol_parse.py more
+To use it, run ``python -i sol_parse.py results_4only.txt results_lut.txt``,
+passing in the filenames of all files containing results. Then, call the
+function ``show_top10(num_large, max, invert, weighted)`` where 'num_large' is
+1, 2, 3, or 4, giving how many large numbers to choose. 'max' is the maximum
+possible value, corresponding to every target being winnable with every gameset,
+used for computing and showing percentages. You can find appropriate values in
+the table below. 'invert' is whether to reverse the sorting order, i.e. show the
+best 10 sets instead of the worst 10. 'weighted' is whether to use the total
+number of games or the games weighted by probability of occurrence.
 
 Converting the results to percentages
--------------------------------------
+=====================================
 
 All of the results are computed as "number of winnable games". These aren't
 very informative without knowing how many games there are in total though. So
@@ -103,7 +162,7 @@ you can use to compute percentages. If you wanted the real total games, you
 should multiply all results from 1L or 3L by 2.
 
 Summary of results
-------------------
+==================
 
 Here are the best sets for each number of chosen large numbers:
 
