@@ -16,7 +16,7 @@ std::size_t myhash(SET const& s) {
 	return res;
 }
 
-std::array<std::pair<SET, RES>, 8'000'000> newcache;
+std::array<std::pair<SET, RES>, 4'000'000> newcache;
 
 // input format: array of 6 numbers, in nonincreasing order. padded with zeros
 // at the end if some numbers are used already. output: a bitset where the
