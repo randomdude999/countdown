@@ -3,82 +3,82 @@
 #include <iostream>
 
 using VAL = unsigned int;
-using SET = std::array<VAL, 6>;
+template<int L>
+using SET = std::array<VAL, L>;
 using RES = std::bitset<900>;
 
 // this is basically just FNV except operating on integers instead of bytes.
-std::size_t myhash(SET const& s) {
-	std::size_t res = 0xcbf29ce484222325;
-	for(int i=0;i<6;i++) {
+template<int L>
+size_t myhash(SET<L> const& s) {
+	size_t res = 0xcbf29ce484222325;
+	for(int i=0;i<L;i++) {
 		res ^= s[i];
 		res *= 0x00000100000001B3;
 	}
 	return res;
 }
 
-std::array<std::pair<SET, RES>, 4'000'000> newcache;
+template<int L>
+std::array<std::pair<SET<L>, RES>, (1<<20)> newcache;
 
-// input format: array of 6 numbers, in nonincreasing order. padded with zeros
-// at the end if some numbers are used already. output: a bitset where the
-// lowest bit means "100 is reachable", and so on up to 999 (900 bits total)
-RES reach_set(SET inp) {
+// input format: array of L numbers, in nonincreasing order
+// output: a bitset where the lowest bit means "100 is reachable", and so on up
+// to 999 (900 bits total)
+template<int L>
+RES reach_set(SET<L> inp) {
 	RES res{};
 
 	// if we only have 2 numbers left, find all possible numbers directly
-	if(inp[2] == 0) {
+	if constexpr(L == 2) {
 		VAL x = inp[0], y = inp[1];
 		for(VAL r : std::array<VAL,4> {x+y,x-y,x*y, (y && (x%y==0)) ? x/y : 0})
 			if(r > 99 && r < 1000) res.set(r-100);
 		return res;
-	}
-
-	uint64_t inp_h = myhash(inp) % newcache.size();
-
-	if(newcache[inp_h].first == inp) return newcache[inp_h].second;
-	
-	// if we have seen this exact set of numbers already, return the same answer
-	//if(localcache.count(inp)) return localcache[inp];
-	// if it was seen in the previous iteration, return it and save it to this
-	// iteration's cache
-	//if(oldcache.count(inp)) { return localcache[inp] = oldcache[inp]; }
-
-	// otherwise, find new possible sets of numbers and call reach_set recursively
-	for(int i=0;i<6;i++) {
-		if(inp[i] == 0) break;
-		VAL x = inp[i];
-		for(int j=i+1;j<6;j++) {
-			if(inp[j] == 0) break;
-			VAL y = inp[j];
-			for(VAL r : std::array<VAL,4> {x+y,x-y,x*y, (y && (x%y==0)) ? x/y : 0}) {
-				// negative numbers aren't possible because x>=y. we can still
-				// get 0 from subtraction though
-				if(r == 0) continue;
-				if(r == x || r == y) continue; // mul or div by 1
-				if(r > 99 && r < 1000) res.set(r-100);
-				// this is basically a messy way to do the equivalent of
-				// remaining = sorted(inp - {x} - {y} + {r})
-				// but hopefully it's faster
-				SET remaining{};
-				int k=0;
-				bool r_added = false;
-				for(int l=0;l<6;l++) {
-					if(inp[l] < r && !r_added) remaining[k++] = r, r_added = true;
-					if(l!=i && l!=j) remaining[k++] = inp[l];
-				}
-				if(!r_added) remaining[k++] = r;
-				res |= reach_set(remaining);
-			}
-			
+	} else {
+		uint64_t inp_h;
+		// if we have seen this exact set of numbers already, return the same answer
+		if constexpr(L != 6) {
+			inp_h = myhash<L>(inp) % newcache<L>.size();
+			if(newcache<L>[inp_h].first == inp) return newcache<L>[inp_h].second;
 		}
+		
+		// otherwise, find new possible sets of numbers and call reach_set recursively
+		for(int i=0;i<L;i++) {
+			VAL x = inp[i];
+			for(int j=i+1;j<L;j++) {
+				VAL y = inp[j];
+				for(VAL r : std::array<VAL,4> {x+y,x-y,x*y, (y && (x%y==0)) ? x/y : 0}) {
+					// negative numbers aren't possible because x>=y. we can still
+					// get 0 from subtraction though
+					if(r == 0) continue;
+					if(r == x || r == y) continue; // mul or div by 1
+					if(r > 99 && r < 1000) res.set(r-100);
+					// this is basically a messy way to do the equivalent of
+					// remaining = sorted(inp - {x} - {y} + {r})
+					// but hopefully it's faster
+					SET<L-1> remaining{};
+					int k=0;
+					bool r_added = false;
+					for(int l=0;l<L;l++) {
+						if(inp[l] < r && !r_added) remaining[k++] = r, r_added = true;
+						if(l!=i && l!=j) remaining[k++] = inp[l];
+					}
+					if(!r_added) remaining[k++] = r;
+					res |= reach_set<L-1>(remaining);
+				}
+				
+			}
+		}
+		if constexpr(L != 6) {
+			newcache<L>[inp_h].first = inp;
+			newcache<L>[inp_h].second = res;
+		}
+		return res;
 	}
-	//return localcache[inp] = res;
-	newcache[inp_h].first = inp;
-	newcache[inp_h].second = res;
-	return res;
 };
 
 size_t reach_set_wrap(VAL a, VAL b, VAL c, VAL d, VAL e, VAL f) {
-	RES r = reach_set(SET{a,b,c,d,e,f});
+	RES r = reach_set<6>(SET<6>{a,b,c,d,e,f});
 	// the only number that needs to be manually checked like this: all other
 	// inputs are less than 100 and thus every other target must be obtained by
 	// an operation, so it'll be handled in reach_set's main recursion
@@ -122,7 +122,7 @@ void doset(std::array<VAL, 4> bigs) {
 					for(int c=b;c<11;c++) {
 						for(int d=c;d<11;d++) {
 							// increasing or equal order right now
-							// make sure there isn't 3 of any?
+							// make sure there isn't 3 of any
 							if(a == b && a == c) continue;
 							if(b == c && b == d) continue;
 							size_t res = reach_set_wrap(bigs[big1], bigs[big2],d,c,b,a);
@@ -144,7 +144,7 @@ void doset(std::array<VAL, 4> bigs) {
 					for(int d=c;d<11;d++) {
 						for(int e=d;e<11;e++) {
 							// increasing or equal order right now
-							// make sure there isn't 3 of any?
+							// make sure there isn't 3 of any
 							if(a == b && a == c) continue;
 							if(b == c && b == d) continue;
 							if(c == d && d == e) continue;
@@ -170,7 +170,7 @@ void lut_ones() {
 					for(int d=c;d<11;d++) {
 						for(int e=d;e<11;e++) {
 							// increasing or equal order right now
-							// make sure there isn't 3 of any?
+							// make sure there isn't 3 of any
 							if(a == b && a == c) continue;
 							if(b == c && b == d) continue;
 							if(c == d && d == e) continue;
