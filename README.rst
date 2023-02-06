@@ -86,10 +86,10 @@ Running the solver
 The main solver can be invoked in 4 different ways, corresponding to computing
 the LUTs for 1, 2, or 3 chosen large numbers, and for computing the results
 directly for 4 chosen larges. The most time-consuming part is computing the 4
-larges results: this took around 60 CPU-hours in total on my laptop (but i have
-6 cores, so it only took around 10 hours of real time in total). Computing the
+larges results: this took around 45 CPU-hours in total on my laptop (but i have
+6 cores, so it only took around 8 hours of real time in total). Computing the
 LUTs for 1 and 2 chosen larges takes pretty much negligible amounts of time,
-but the LUT for 3 chosen larges takes another 10 CPU-hours.
+but the LUT for 3 chosen larges takes another 7 CPU-hours.
 
 Note that all the filenames in this section are arbitrary, you don't have to
 use these exact names. Also, for the 3LUT/4-large sections, if you parallelize
